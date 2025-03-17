@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class SignUp extends StatefulWidget {
   const SignUp({super.key});
@@ -13,40 +14,56 @@ class _SignUpState extends State<SignUp> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  bool isLoading = false; // लोडिंग स्टेट के लिए
+  bool isLoading = false;
 
-  // Firebase Authentication से SignUp Function
-  Future<void> signUp() async {
-    setState(() {
-      isLoading = true;
-    });
+  final DatabaseReference _database = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: "https://people-731e5-default-rtdb.firebaseio.com/",
+  ).ref().child("Users");
 
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
-      // Success Message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Account Created Successfully!")),
-      );
+  //  Sign Up Function with Loading State
+  void signUp() async {
+    String name = nameController.text.trim();
+    String email = emailController.text.trim();
+    String password = passwordController.text.trim();
 
-      // SignUp के बाद Login Page पर ले जाएं
-      Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
-      String message = "An error occurred!";
-      if (e.code == 'email-already-in-use') {
-        message = "This email is already registered!";
-      } else if (e.code == 'weak-password') {
-        message = "Password is too weak!";
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } finally {
+    if (name.isNotEmpty && email.isNotEmpty && password.isNotEmpty) {
       setState(() {
-        isLoading = false;
+        isLoading = true;
       });
+
+      try {
+        String userId = _database.push().key ?? "";
+
+        Map<String, String> user = {
+          "name": name,
+          "email": email,
+          "password": password
+        };
+
+        await _database.child(userId).set(user);
+
+        //  Success Message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Registration Successful!")),
+        );
+
+        nameController.clear();
+        emailController.clear();
+        passwordController.clear();
+      } catch (error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $error")),
+        );
+      } finally {
+        setState(() {
+          isLoading = false; // लोडिंग बंद
+        });
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please fill all fields")),
+      );
     }
   }
 
@@ -111,7 +128,7 @@ class _SignUpState extends State<SignUp> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Sign Up Button
+                    //  Sign Up Button with Loading Indicator
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
